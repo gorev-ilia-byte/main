@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 
 # --- КОНФИГУРАЦИЯ ---
-TOKEN = "8516601851:AAGOrxj8tW_p249wRQIkNdKE3uWOKWsENv0"
+TOKEN = "8469292735:AAEe7Iihd499ed0izn-84KALqnk2ElqI8Fw"
 GROUP_ID = -1003717188130 
 TRUSTED_ADMINS = [1295847583, 5818997833] 
 # --------------------
@@ -134,4 +134,5 @@ async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
+
     asyncio.run(main())
