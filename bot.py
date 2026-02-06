@@ -2,14 +2,21 @@ import asyncio
 import re
 import logging
 from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import (
+    InlineKeyboardMarkup, 
+    InlineKeyboardButton, 
+    ReplyKeyboardMarkup, 
+    KeyboardButton, 
+    ReplyKeyboardRemove
+)
 
 # --- КОНФИГУРАЦИЯ ---
 TOKEN = "8469292735:AAEe7Iihd499ed0izn-84KALqnk2ElqI8Fw"
-GROUP_ID = -1003717188130 
-TRUSTED_ADMINS = [1295847583, 5818997833] 
+GROUP_ID = -1003717188130  # ID твоей группы
+TRUSTED_ADMINS = [1295847583, 5818997833]  # ID тех, кто может жать кнопки
 # --------------------
 
 logging.basicConfig(level=logging.INFO)
@@ -17,9 +24,14 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 class Form(StatesGroup):
-    nickname, age, kills, timezone, experience, user_tg = State(), State(), State(), State(), State(), State()
+    nickname = State()
+    age = State()
+    kills = State()
+    timezone = State()
+    experience = State()
+    user_tg = State()
 
-# Удобная клавиатура для часовых поясов
+# Клавиатура выбора часового пояса
 def get_tz_keyboard():
     buttons = [
         [KeyboardButton(text="МСК (Киев/Минск)"), KeyboardButton(text="МСК +1 (Самара)")],
@@ -29,42 +41,57 @@ def get_tz_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True, one_time_keyboard=True)
 
-# --- ОБРАБОТЧИКИ АНКЕТЫ ---
+# --- ОБРАБОТЧИКИ ---
 
-@dp.message(F.text == "/start")
+# Команда /id теперь работает везде (и в ЛС, и в группе)
+@dp.message(Command("id"))
+async def cmd_id(message: types.Message):
+    await message.answer(f"ID этого чата: <code>{message.chat.id}</code>", parse_mode="HTML")
+
+@dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    if message.chat.type != 'private': return 
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔥 Подать заявку", callback_data="start_anketa")]])
-    await message.answer("Привет! Нажми на кнопку для заполнения анкеты в **Q9**.", reply_markup=kb)
+    if message.chat.type != 'private':
+        return 
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔥 Подать заявку", callback_data="start_anketa")
+    ]])
+    await message.answer("Привет! Нажми кнопку ниже, чтобы заполнить анкету в <b>Q9</b>.", reply_markup=kb, parse_mode="HTML")
 
 @dp.callback_query(F.data == "start_anketa")
 async def s1(c: types.CallbackQuery, state: FSMContext):
-    await c.message.answer("1️⃣ Твой игровой ник:"); await state.set_state(Form.nickname); await c.answer()
+    await c.message.answer("1️⃣ Твой игровой ник:")
+    await state.set_state(Form.nickname)
+    await c.answer()
 
 @dp.message(Form.nickname)
 async def s2(m: types.Message, state: FSMContext):
-    await state.update_data(nickname=m.text); await m.answer("2️⃣ Твой возраст:"); await state.set_state(Form.age)
+    await state.update_data(nickname=m.text)
+    await m.answer("2️⃣ Твой возраст:")
+    await state.set_state(Form.age)
 
 @dp.message(Form.age)
 async def s3(m: types.Message, state: FSMContext):
-    await state.update_data(age=m.text); await m.answer("3️⃣ Сколько всего киллов:"); await state.set_state(Form.kills)
+    await state.update_data(age=m.text)
+    await m.answer("3️⃣ Сколько всего киллов:")
+    await state.set_state(Form.kills)
 
 @dp.message(Form.kills)
 async def s4(m: types.Message, state: FSMContext):
     await state.update_data(kills=m.text)
-    await m.answer("4️⃣ Выбери свой часовой пояс (разница с Москвой):", reply_markup=get_tz_keyboard())
+    await m.answer("4️⃣ Выбери свой часовой пояс:", reply_markup=get_tz_keyboard())
     await state.set_state(Form.timezone)
 
 @dp.message(Form.timezone)
 async def s5(m: types.Message, state: FSMContext):
-    # Если ввел руками, а не кнопкой — тоже примем, но кнопки удобнее
     await state.update_data(timezone=m.text)
     await m.answer("5️⃣ Твой опыт в других кланах:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(Form.experience)
 
 @dp.message(Form.experience)
 async def s6(m: types.Message, state: FSMContext):
-    await state.update_data(experience=m.text); await m.answer("6️⃣ Впиши свой Юзернейм (@...):"); await state.set_state(Form.user_tg)
+    await state.update_data(experience=m.text)
+    await m.answer("6️⃣ Впиши свой Юзернейм Телеграм (через @):")
+    await state.set_state(Form.user_tg)
 
 @dp.message(Form.user_tg)
 async def final_step(m: types.Message, state: FSMContext):
@@ -88,11 +115,16 @@ async def final_step(m: types.Message, state: FSMContext):
         InlineKeyboardButton(text="❌ Отказ", callback_data=f"no|{uid}")
     ]])
 
-    await bot.send_message(GROUP_ID, report, reply_markup=kb, parse_mode="HTML")
-    await m.answer("✅ Анкета отправлена в штаб!")
+    try:
+        await bot.send_message(GROUP_ID, report, reply_markup=kb, parse_mode="HTML")
+        await m.answer("✅ Анкета отправлена! Ожидай решения.")
+    except Exception as e:
+        await m.answer("❌ Ошибка: бот не может отправить анкету в группу.")
+        logging.error(f"Ошибка отправки: {e}")
+    
     await state.clear()
 
-# --- ЛОГИКА АДМИНОВ ---
+# --- ЛОГИКА АДМИН-ГРУППЫ ---
 
 @dp.callback_query(F.data.startswith("ok|") | F.data.startswith("no|"))
 async def admin_action(callback: types.CallbackQuery):
@@ -113,8 +145,10 @@ async def admin_action(callback: types.CallbackQuery):
         
         new_text = current_text.replace("<i>скрыт до одобрения</i>", f"<b>{user_tg}</b>")
     else:
-        try: await bot.send_message(target_uid, "❌ Твоя заявка отклонена.")
-        except: pass
+        try:
+            await bot.send_message(target_uid, "❌ Твоя заявка в сквад отклонена.")
+        except:
+            pass
         new_text = current_text
         res_text = f"\n\n🔴 <b>ОТКАЗАНО</b>\nАдмин: {callback.from_user.first_name}"
 
@@ -128,11 +162,10 @@ async def admin_action(callback: types.CallbackQuery):
         )
         await callback.answer("Готово!")
     except Exception as e:
-        logging.error(f"Ошибка: {e}")
+        logging.error(f"Ошибка редактирования: {e}")
 
 async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-
     asyncio.run(main())
