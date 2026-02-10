@@ -90,7 +90,7 @@ async def s5(m: types.Message, state: FSMContext):
 @dp.message(Form.experience)
 async def s6(m: types.Message, state: FSMContext):
     await state.update_data(experience=m.text)
-    await m.answer("6️⃣ Впиши свой Юзернейм Телеграм (через @):")
+    await m.answer("6️⃣ Напиши свой юзернейм telegram (через @):")
     await state.set_state(Form.user_tg)
 
 @dp.message(Form.user_tg)
@@ -169,3 +169,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
